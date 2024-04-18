@@ -1,3 +1,4 @@
+import keras.layers
 import tensorflow as tf
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
@@ -13,29 +14,22 @@ epochs = 10
 
 datagen = ImageDataGenerator(rescale=1./255)
 
-train_generator = datagen.flow_from_directory(
-    "", # Путь к обучающей выборке
-    target_size=image_size,
-    batch_size=batch_size,
-    class_mode='categorical',
-    shuffle=True
-)
 
-val_generator = datagen.flow_from_directory(
-    "", # Путь к валидационной выборке
-    target_size=image_size,
-    batch_size=batch_size,
-    class_mode='categorical',
-    shuffle=False
-)
+def dataset(path, shuffle):
+    return datagen.flow_from_directory(
+        path,
+        target_size=image_size,
+        batch_size=batch_size,
+        class_mode="categorical",
+        shuffle=shuffle
+    )
 
-test_generator = datagen.flow_from_directory(
-    "", # Путь к тестовой выборке
-    target_size=image_size,
-    batch_size=batch_size,
-    class_mode='categorical',
-    shuffle=False
-)
+
+train_generator = dataset("Dataset/Train", True)
+
+val_generator = dataset("Dataset/Validate", False)
+
+test_generator = dataset("Dataset/Test", False)
 
 model = Sequential([
     Conv2D(32, (3, 3), activation='relu', input_shape=(image_size[0], image_size[1], 3)),
@@ -44,10 +38,14 @@ model = Sequential([
     MaxPooling2D((2, 2)),
     Conv2D(128, (3, 3), activation='relu'),
     MaxPooling2D((2, 2)),
+    keras.layers.BatchNormalization(),
+    keras.layers.Dropout(0.99),
     Flatten(),
     Dense(128, activation='relu'),
-    Dense(2, activation='softmax')
+    Dense(8, activation='sigmoid')
 ])
+
+model.summary()
 
 model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
               loss='categorical_crossentropy',
@@ -69,29 +67,11 @@ print("Test Precision:", evaluation[2])
 print("Test Recall:", evaluation[3])
 print("Test AUC:", evaluation[4])
 
-#model.save("model_name.h5") # Название модели
+model.save("cnn7.h5")
 
-# Тестирование модели, также можно тестировать модель в отдельном файле предварительно загрузив ее командой load_model("model_name.h5")
 test_data, test_labels = test_generator.next()
 
 print(test_generator.class_indices)
 
 print(f'Test Data Shape: {test_data.shape}')
 print(f'Test Labels Shape: {test_labels.shape}')
-
-image_path = '' # Путь к изображению, которую модель должна предсказать
-img = image.load_img(image_path, target_size=image_size)
-img_array = image.img_to_array(img)
-img_array = np.expand_dims(img_array, axis=0)
-img_array /= 255.0
-
-predictions = model.predict(img_array)
-
-print("Predicted probabilities:", predictions)
-
-predicted_class_index = np.argmax(predictions)
-print("Predicted class index:", predicted_class_index)
-
-class_indices = {0: 'class_1', 1: 'class_2'}
-predicted_class_name = class_indices[predicted_class_index]
-print("Predicted class name:", predicted_class_name)
